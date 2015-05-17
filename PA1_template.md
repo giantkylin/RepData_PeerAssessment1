@@ -1,0 +1,152 @@
+---
+title: "Reproducible Research Assignment 1"
+author: "Yue"
+date: "Saturday, May 16, 2015"
+output: html_document
+---
+
+
+
+##Loading and preprocessing the data
+1. Show any code that is needed to
+2. Load the data (i.e. read.csv())
+3. Process/transform the data (if necessary) into a format suitable for your analysis
+
+
+```r
+temp <- tempfile()
+download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", temp)
+data <- read.csv(unz(temp, "activity.csv"))
+unlink(temp)
+str(data)
+```
+
+```
+## 'data.frame':	17568 obs. of  3 variables:
+##  $ steps   : int  NA NA NA NA NA NA NA NA NA NA ...
+##  $ date    : Factor w/ 61 levels "2012-10-01","2012-10-02",..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ interval: int  0 5 10 15 20 25 30 35 40 45 ...
+```
+
+##What is mean total number of steps taken per day?
+1. For this part of the assignment, you can ignore the missing values in the dataset.
+2. Calculate the total number of steps taken per day
+3. If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day
+4. Calculate and report the mean and median of the total number of steps taken per day
+
+
+```r
+library(dplyr)
+library(ggplot2)
+by_date <- group_by(data, date)
+steps_sum <- summarise(by_date, total = sum(steps, na.rm = TRUE))
+steps_mean <- round(mean(steps_sum$total), 1)
+steps_median <- round(median(steps_sum$total), 1)
+g <- qplot(total, data=steps_sum, xlab = 'total steps taken per day', ylab = 'days')
+g + geom_text(aes(20000,10, label = paste("mean=", steps_mean))) +
+  geom_text(aes(20000,9, label = paste("median=", steps_median)))
+```
+
+![plot of chunk unnamed-chunk-2](figure/unnamed-chunk-2-1.png) 
+
+##What is the average daily activity pattern?
+1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+
+```r
+by_interval <- group_by(data, interval)
+steps_avgmin <- summarise(by_interval, avg = mean(steps, na.rm = TRUE))
+maxstepinterval <- filter(steps_avgmin,avg == max(avg))
+no_row <- which(steps_avgmin$interval == maxstepinterval$interval)
+g <- qplot(x = interval, y = avg, data=steps_avgmin, xlab = 'Time', ylab = 'avg steps')
+g + geom_text(aes(1300,200,label = paste("max step interval:", no_row))) + geom_line()
+```
+
+![plot of chunk unnamed-chunk-3](figure/unnamed-chunk-3-1.png) 
+
+##Imputing missing values
+1. Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+2. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+
+```r
+no_NA <- sum(is.na(data$steps))
+print(no_NA)
+```
+
+```
+## [1] 2304
+```
+
+3. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+4. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+
+```r
+data_new <- data
+na_row <- which(is.na(data_new$steps))
+for (row in na_row){
+  temp_row <-which(steps_avgmin$interval == data_new[row,'interval'])
+  data_new[row,'steps'] <- steps_avgmin[temp_row, 'avg'] 
+}
+str(data_new)
+```
+
+```
+## 'data.frame':	17568 obs. of  3 variables:
+##  $ steps   : num  1.717 0.3396 0.1321 0.1509 0.0755 ...
+##  $ date    : Factor w/ 61 levels "2012-10-01","2012-10-02",..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ interval: int  0 5 10 15 20 25 30 35 40 45 ...
+```
+
+```r
+str(data)
+```
+
+```
+## 'data.frame':	17568 obs. of  3 variables:
+##  $ steps   : int  NA NA NA NA NA NA NA NA NA NA ...
+##  $ date    : Factor w/ 61 levels "2012-10-01","2012-10-02",..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ interval: int  0 5 10 15 20 25 30 35 40 45 ...
+```
+
+5. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+
+```r
+by_date_new <- group_by(data_new, date)
+steps_sum_new <- summarise(by_date_new, total = sum(steps, na.rm = TRUE))
+steps_mean_new <- round(mean(steps_sum_new$total), 1)
+steps_median_new <- round(median(steps_sum_new$total), 1)
+g <- qplot(total, data=steps_sum_new, xlab = 'total steps taken per day', ylab = 'days')
+g + geom_text(aes(20000,12, label = paste("mean=", steps_mean))) +
+  geom_text(aes(20000,11, label = paste("median=", steps_median)))
+```
+
+![plot of chunk unnamed-chunk-6](figure/unnamed-chunk-6-1.png) 
+
+##Are there differences in activity patterns between weekdays and weekends?
+
+1. For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+2. Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+3. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+
+
+```r
+data_new$date <- as.Date(data_new$date, "%Y-%m-%d")
+data_new <- mutate(data_new, weekday = weekdays(data_new$date))
+data_new <- mutate(data_new, weekend = ifelse(weekday %in% c("Saturday", "Sunday"), "weekend", "weekday"))
+data_new$weekend <- as.factor(data_new$weekend)
+data_result <- group_by(data_new, weekend, interval)
+data_result <- summarize(data_result, avgsteps = mean(steps))
+qplot(x= interval, y= avgsteps, data= data_result, geom = 'line', facets = weekend~.,
+      xlab = 'Time', ylab = 'Average Steps')
+```
+
+![plot of chunk unnamed-chunk-7](figure/unnamed-chunk-7-1.png) 
+
+##Observation
+### Participant starts to be active around 5:30am on Weekdays and takes the most steps of the week on Weekdays between 8:15am and 8:45am. 
+### On the Weekends, activity is delayed until around 8:00am, while there is more activity during the day on average.  
+### Generally, by 20:00 (8pm) most activity has stopped on Weekdays, while Weekends show surges of activity until 21:30 (9:30pm).
